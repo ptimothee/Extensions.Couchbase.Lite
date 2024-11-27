@@ -46,7 +46,7 @@ jobs:
     displayName: dotnet pack
     inputs:
       command: pack
-      searchPatternPack: src/*.csproj
+      searchPatternPack: src/Extensions.Couchbase.Lite/*.csproj
       versioningScheme: byEnvVar
       versionEnvVar: semVer
       buildProperties: 'Authors="Patrick Timothee";Product="Codemancer.Extensions.Couchbase.Lite";PackageLicenseExpression="MIT";MaintainerEmail="patrick.timothee@gmail.com";RepositoryType=git;PackageProjectUrl="$(Build.Repository.Uri)";RepositoryUrl="$(Build.Repository.Uri)";RepositoryCommit=$(Build.SourceVersion);RepositoryBranch="$(Build.SourceBranchName)";PackageTags="Couchbase.Lite"'
