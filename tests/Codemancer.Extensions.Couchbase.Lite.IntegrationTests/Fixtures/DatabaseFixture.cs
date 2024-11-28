@@ -7,6 +7,8 @@ public class DatabaseFixture : IDisposable
     public DatabaseFixture()
     {
         Database = new Database("test-database");
+        Database.Delete();
+        Database = new Database("test-database");
     }
 
     public Database Database { get; }
