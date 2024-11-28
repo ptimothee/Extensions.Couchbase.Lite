@@ -1,0 +1,56 @@
+name: $(Rev:r)
+
+resources:
+  repositories:
+  - repository: self
+    type: git
+    ref: refs/heads/main
+
+trigger:
+ branches:
+    include:
+      -  main
+      -  development
+      -  features/*
+
+variables:
+  version: 0.0
+  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    semVer: $(version).0
+    assemblyVersion: "$(version).0.$(Build.BuildNumber)"
+  ${{ else }}:
+    semVer: $(version).0-beta.$(Build.BuildNumber)
+    assemblyVersion: "$(version).0.$(Build.BuildNumber)"
+
+jobs:
+- job: Job_1
+  displayName: Create Package
+
+  pool:
+    vmImage: windows-latest
+
+  steps:
+  - checkout: self
+    clean: true
+    fetchTags: false
+  - task: DotNetCoreCLI@2
+    displayName: dotnet build
+    inputs:
+      arguments: --configuration Release -property:Version=$(assemblyVersion)
+  - task: DotNetCoreCLI@2
+    displayName: dotnet test
+    inputs:
+      command: test
+      projects: '**/Codemancer.Extensions.Couchbase.Lite.UnitTests.csproj'
+  - task: DotNetCoreCLI@2
+    displayName: dotnet pack
+    inputs:
+      command: pack
+      searchPatternPack: src/Extensions.Couchbase.Lite/*.csproj
+      versioningScheme: byEnvVar
+      versionEnvVar: semVer
+      buildProperties: 'Authors="Patrick Timothee";Product="Codemancer.Extensions.Couchbase.Lite";PackageLicenseExpression="MIT";MaintainerEmail="patrick.timothee@gmail.com";RepositoryType=git;PackageProjectUrl="$(Build.Repository.Uri)";RepositoryUrl="$(Build.Repository.Uri)";RepositoryCommit=$(Build.SourceVersion);RepositoryBranch="$(Build.SourceBranchName)";PackageTags="Couchbase.Lite"'
+  - task: PublishBuildArtifacts@1
+    displayName: publish artifacts
+    inputs:
+      PathtoPublish: '$(build.artifactstagingdirectory)'
