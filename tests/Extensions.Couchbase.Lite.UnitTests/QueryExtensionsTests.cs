@@ -1,12 +1,11 @@
 using AutoFixture;
 using FluentAssertions;
 using Couchbase.Lite.Query;
-using Codemancer.Extensions.Couchbase.Lite.UnitTests.Fixtures.Models;
 using Codemancer.Extensions.Couchbase.Lite.UnitTests.Fixtures.Customizations;
 
 namespace Codemancer.Extensions.Couchbase.Lite.Tests;
 
-public class ExtensionsTests
+public class QueryExtensionsTests
 {
     [Fact]
     [Trait("category", "unit-test")]
@@ -23,7 +22,7 @@ public class ExtensionsTests
         var query = fixture.Create<IQuery>();
 
         // Act
-        Func<IEnumerable<Person>> func = () => query.Execute<Person>();
+        Func<IEnumerable<string?>> func = () => query.Execute<string>();
 
         // Assert
         func.Should()
@@ -46,7 +45,7 @@ public class ExtensionsTests
         var query = fixture.Create<IQuery>();
 
         // Act
-        using var liveResults = query.Execute<Person>().AsLiveCollection();
+        using var liveResults = query.Execute<string>().AsLiveCollection();
 
         // Assert
         Action action = () => liveResults.Count();

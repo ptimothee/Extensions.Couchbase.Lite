@@ -68,7 +68,7 @@ public static class ObjectExtensionsTestFixture
 
         yield return new object[]
         {
-            new Person { Name = "John", Age = 44 },
+            new { Name = "John", Age = 44 },
             new Dictionary<string, object?>
             {
                 { "Name", "John" },
@@ -105,7 +105,7 @@ public static class ObjectExtensionsTestFixture
             }
         };
 
-        var stream = new MemoryStream(new byte[] { 0x01, 0x02, 0x03, 0x04 });
+        var stream = new MemoryStream([0x01, 0x02, 0x03, 0x04]);
         yield return new object[]
         {
             new { Data = stream },
@@ -115,7 +115,7 @@ public static class ObjectExtensionsTestFixture
             }
         };
 
-        var blob = new Blob(string.Empty, new MemoryStream(new byte[] { 0x01, 0x02, 0x03, 0x04 }));
+        var blob = new Blob(string.Empty, new MemoryStream([0x01, 0x02, 0x03, 0x04 ]));
         yield return new object[]
         {
             new { Data = blob },
