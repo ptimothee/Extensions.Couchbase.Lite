@@ -1,20 +1,19 @@
 ﻿using System.Collections;
-using Couchbase.Lite;
 using Couchbase.Lite.Query;
 
 namespace Codemancer.Extensions.Couchbase.Lite;
 
-public class CouchbaseLiteLiveResults<T> : IEnumerable<T>, IDisposable
+public class CouchbaseLiteLiveResults<T> : IEnumerable<T?>, IDisposable
 {
     private readonly IQuery _query;
     private IDisposable? _subscription;
-    private Lazy<IEnumerable<T>> _lazyResult;
+    private Lazy<IEnumerable<T?>> _lazyResult;
 
     internal CouchbaseLiteLiveResults(IQuery query)
     {
         _query = query;
         var result = GetResults();
-        _lazyResult = new Lazy<IEnumerable<T>>(() => result);
+        _lazyResult = new Lazy<IEnumerable<T?>>(() => result);
     }
 
     IEnumerator IEnumerable.GetEnumerator()
@@ -22,7 +21,7 @@ public class CouchbaseLiteLiveResults<T> : IEnumerable<T>, IDisposable
         return this.GetEnumerator();
     }
 
-    public IEnumerator<T> GetEnumerator()
+    public IEnumerator<T?> GetEnumerator()
     {
         return _lazyResult.Value.GetEnumerator();
     }
@@ -37,7 +36,7 @@ public class CouchbaseLiteLiveResults<T> : IEnumerable<T>, IDisposable
         _subscription = SubscribeForNotifications(ResetResults, FailResults);
     }
 
-    public IDisposable SubscribeForNotifications(Action<object?, IEnumerable<T>> onResultChanged, Action<object?, Exception>? onError = null)
+    public IDisposable SubscribeForNotifications(Action<object?, IEnumerable<T?>> onResultChanged, Action<object?, Exception>? onError = null)
     {
         var taskScheduler = GetTaskScheduler();
 
@@ -65,17 +64,17 @@ public class CouchbaseLiteLiveResults<T> : IEnumerable<T>, IDisposable
         _query.Dispose();
     }
 
-    private void ResetResults(object? sender, IEnumerable<T> results)
+    private void ResetResults(object? sender, IEnumerable<T?> results)
     {
-        _lazyResult = new Lazy<IEnumerable<T>>(() => results);
+        _lazyResult = new Lazy<IEnumerable<T?>>(() => results);
     }
 
     private void FailResults(object? sender, Exception error)
     {
-        _lazyResult = new Lazy<IEnumerable<T>>(() => throw error);
+        _lazyResult = new Lazy<IEnumerable<T?>>(() => throw error);
     }
 
-    private IEnumerable<T> GetResults()
+    private List<T?> GetResults()
     {
         using (var result = _query.Execute())
         {
