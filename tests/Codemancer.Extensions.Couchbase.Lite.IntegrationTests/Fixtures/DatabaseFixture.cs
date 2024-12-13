@@ -6,16 +6,22 @@ public class DatabaseFixture : IDisposable
 {
     public DatabaseFixture()
     {
-        Database = new Database("test-database");
-        Database.Delete();
-        Database = new Database("test-database");
+        DB = new Database("test-database");
     }
 
-    public Database Database { get; }
+    public Database DB { get; }
 
     public void Dispose()
     {
-        Database.Delete();
-        Database.Dispose();
+        DB.Dispose();
+        Database.Delete("test-database", null);
     }
+}
+
+[CollectionDefinition("Database collection")]
+public class DatabaseCollection : ICollectionFixture<DatabaseFixture>
+{
+    // This class has no code, and is never created. Its purpose is simply
+    // to be the place to apply [CollectionDefinition] and all the
+    // ICollectionFixture<> interfaces.
 }
