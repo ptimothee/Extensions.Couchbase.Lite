@@ -9,14 +9,16 @@ public static class CouchbaseLiteBuilderExtensions
 {
     public static ICouchbaseLiteBuilder AddCouchbaseLite(this IServiceCollection services, string databaseName, Action<DatabaseConfiguration>? configure = null)
     {
+        DatabaseConfiguration? configuration = null;
         if (configure is not null)
         {
-            services.Configure(configure);
+            configuration = new();
+            configure(configuration);
         }
-
+        
         services.AddSingleton<Database>(sp =>
         {
-            return new Database(databaseName);
+            return new Database(databaseName, configuration);
         });
 
         return new CouchbaseLiteBuilder(services);
