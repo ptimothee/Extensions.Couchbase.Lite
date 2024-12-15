@@ -13,9 +13,9 @@ public class SyncOptions
 
     public Uri Endpoint { get; }
 
-    public Database Database { get; set; }
+    public Database Database { get; }
 
-    public Action<string, IReplicatorConfigurationBuilder> ConfigureReplication { get; set; } = (scopeName, builder) => { };
+    public Action<string, IReplicatorConfigurationBuilder> ConfigureReplication { get; set; } = (username, builder) => { };
 
     public SyncEvents Events { get; set; } = new SyncEvents();
 }

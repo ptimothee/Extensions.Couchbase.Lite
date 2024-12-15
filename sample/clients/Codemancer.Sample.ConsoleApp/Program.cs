@@ -38,11 +38,11 @@ var idToken = "";
 
 var credentials = Credentials.CreateJwt(idToken);
 
-await syncGateway.SignedInAsync(credentials);
+await syncGateway.SignInAsync(credentials);
 
 Console.WriteLine("Press any key to terminate. ");
 Console.ReadLine();
 
-await syncGateway.SignedOutAsync();
+await syncGateway.SignOutAsync();
 syncGateway.Dispose();
 

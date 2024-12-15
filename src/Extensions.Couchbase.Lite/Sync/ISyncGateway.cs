@@ -7,9 +7,9 @@ public interface ISyncGateway : IDisposable
 {
     public string  Name { get; }
 
-    public Task SignedInAsync(Credentials credentials, CancellationToken cancellationToken = default);
+    public Task SignInAsync(Credentials credentials, CancellationToken cancellationToken = default);
 
-    public Task SignedOutAsync(CancellationToken cancellationToken = default);
+    public Task SignOutAsync(CancellationToken cancellationToken = default);
 
     public void Start();
 
@@ -33,7 +33,7 @@ public class SyncGateway: ISyncGateway
 
     public string Name { get; }
 
-    public async Task SignedInAsync(Credentials credentials, CancellationToken cancellationToken = default)
+    public async Task SignInAsync(Credentials credentials, CancellationToken cancellationToken = default)
     {
         credentials ??= new AnonymousCredentials();
       
@@ -53,7 +53,7 @@ public class SyncGateway: ISyncGateway
         _replicator.Start();
     }
 
-    public async Task SignedOutAsync(CancellationToken cancellationToken = default)
+    public async Task SignOutAsync(CancellationToken cancellationToken = default)
     {
         if(_replicator is null)
         {
