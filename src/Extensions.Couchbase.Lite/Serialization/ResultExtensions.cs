@@ -18,35 +18,59 @@ public static class ResultExtensions
         foreach (var key in result.Keys)
         {
             var value = result[key]?.Value;
-            if (value is null) // When no value
+
+            // When no value
+            if (value is null) 
             {
                 continue; // Ignore
             }
 
-            if (value is DictionaryObject dictionary) // When Complex type
-            {             
-                foreach (var item in dictionary) // Add all key:value fields
+            // When value is a complex type
+            if (value is DictionaryObject dictionary)
+            {
+                // Deconstruct each field and but promote field names to root object
+                foreach (var item in dictionary) 
                 {
-                    if(item.Value.TryConvertAsDictionary(out var dict))
+                    if (item.Value is DictionaryObject dobj)
                     {
-                        var json = JsonSerializer.Serialize(dict, SerializationConfiguration.DefaultOptions);
+                        var json = JsonSerializer.Serialize(dobj.ToDictionary(), SerializationConfiguration.DefaultOptions);
                         jsonResult[item.Key] = JsonNode.Parse(json);
+                        continue;
                     }
-                    else
+
+                    if (item.Value is ArrayObject arr)
                     {
-                        jsonResult[item.Key] = JsonValue.Create(item.Value);
+                        var json = JsonSerializer.Serialize(arr.ToList(), SerializationConfiguration.DefaultOptions);
+                        jsonResult[item.Key] = JsonNode.Parse(json);
+                        continue;
                     }
+
+                    if (value is Blob blb)
+                    {
+                        jsonResult[key] = JsonValue.Create(Convert.ToBase64String(blb.Content ?? Array.Empty<byte>()));
+                        continue;
+                    }
+
+                    jsonResult[item.Key] = JsonValue.Create(item.Value);
                 }
                 continue;
             }
 
+            // When value is a sequence
+            if (value is ArrayObject array)
+            {             
+                var json = JsonSerializer.Serialize(array.ToList(), SerializationConfiguration.DefaultOptions);
+                jsonResult[key] = JsonArray.Parse(json);
+                continue;
+            }
+
+            // ... value is a simple type
             if (value is Blob blob)
             {
                 jsonResult[key] = JsonValue.Create(Convert.ToBase64String(blob.Content ?? Array.Empty<byte>()));
                 continue;
             }
 
-            //When simple value type
             jsonResult[key] = JsonValue.Create(value);
             continue;
         }
@@ -57,17 +81,5 @@ public static class ResultExtensions
         }
 
         return JsonSerializer.Deserialize<T>(jsonResult, SerializationConfiguration.DefaultOptions);    
-    }
-
-    private static bool TryConvertAsDictionary(this object? obj, out Dictionary<string, object?>? dictionary)
-    {
-        if (obj is DictionaryObject dObj) // Complex Type
-        {
-            dictionary = dObj.ToDictionary();
-            return true;
-        }
-
-        dictionary = null;
-        return false;
     }
 }

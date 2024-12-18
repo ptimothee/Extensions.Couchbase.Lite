@@ -64,8 +64,9 @@ public static class ObjectExtensions
                         continue;
                     }
 
-                    if (propertyType.IsArray && propertyType.GetElementType()!.IsSimple()
-                         || (propertyValue is IList && propertyValue.GetType().GetTypeInfo().GenericTypeArguments[0].IsSimple()))
+
+                    if (propertyType.IsArray && propertyType.GetElementType().IsSimple()
+                        || (!propertyType.IsArray && propertyValue is IList && propertyValue.GetType().GetTypeInfo().GenericTypeArguments[0].IsSimple()))
                     {
 
                         dictionary[propertyName] = propertyValue;
