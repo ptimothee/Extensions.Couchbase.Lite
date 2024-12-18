@@ -21,6 +21,17 @@ public class Person
 
     [JsonPropertyName("photo")]
     public Byte[]? Photo { get; set; }
+
+    [JsonPropertyName("digitalProfiles")]
+    public DigitalProfile[] DigitalProfiles { get; set; } = [];
+}
+
+public class DigitalProfile
+{
+    [JsonPropertyName("siteName")]
+    public string SiteName { get; set; } = string.Empty;
+    [JsonPropertyName("webAddress")]
+    public string WebAddress { get; set; } = string.Empty;
 }
 
 public class Pet
