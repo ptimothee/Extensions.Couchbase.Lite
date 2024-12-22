@@ -45,7 +45,7 @@ public class SyncGateway: ISyncGateway
 
         _config.Authenticator = Credentials.Create(credentials);
 
-        var replicationBuiler = new ReplicatorConfigurationBuilder(_options.Database, _config);
+        var replicationBuiler = new ReplicatorConfigurationBuilder(_options.Database, _options.ScopeName, _config);
         _options.ConfigureReplication(credentials.Username, replicationBuiler);
 
         //var resume = IsRunning(_replicator) || FailedToRun(_replicator);

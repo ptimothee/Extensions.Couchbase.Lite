@@ -6,11 +6,6 @@ namespace Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 public static class SyncGatewayBuilderExtensions
 {
-    public static IReplicatorConfigurationBuilder UseScope(this IReplicatorConfigurationBuilder builder, string scopeName)
-    {
-        return new ReplicatorConfigurationBuilder(builder.Database, builder.ReplicatorConfiguration, scopeName);
-    }
-
     public static IReplicatorConfigurationBuilder LinkCollection(this IReplicatorConfigurationBuilder builder, string collectionName, string[] channels)
     {
         Database db = builder.Database;
@@ -28,6 +23,21 @@ public static class SyncGatewayBuilderExtensions
         };        
 
         builder.ReplicatorConfiguration.AddCollection(collection, collectionConfiguration);
+
+        return builder;
+    }
+
+    public static IReplicatorConfigurationBuilder UnlinkCollection(this IReplicatorConfigurationBuilder builder, string collectionName)
+    {
+        Database db = builder.Database;
+
+        var collection = db.GetCollection(collectionName, builder.ScopeName);
+        if (collection is null)
+        {
+            return builder;
+        }
+
+        builder.ReplicatorConfiguration.RemoveCollection(collection);
 
         return builder;
     }

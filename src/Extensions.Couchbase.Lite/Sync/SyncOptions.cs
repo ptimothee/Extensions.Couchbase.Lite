@@ -13,6 +13,8 @@ public class SyncOptions
 
     public Uri Endpoint { get; }
 
+    public string ScopeName { get; set; } = Collection.DefaultScopeName;
+
     public Database Database { get; }
 
     public Action<string, IReplicatorConfigurationBuilder> ConfigureReplication { get; set; } = (username, builder) => { };
