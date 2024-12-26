@@ -8,6 +8,13 @@ public static class SyncGatewayBuilderExtensions
 {
     public static IReplicatorConfigurationBuilder LinkCollection(this IReplicatorConfigurationBuilder builder, string collectionName, string[] channels)
     {
+        LinkCollection(builder, collectionName, collectionConfig => collectionConfig.Channels = channels);
+
+        return builder;
+    }
+
+    public static IReplicatorConfigurationBuilder LinkCollection(this IReplicatorConfigurationBuilder builder, string collectionName, Action<CollectionConfiguration> configure )
+    {
         Database db = builder.Database;
 
         var collection = db.GetCollection(collectionName, builder.ScopeName);
@@ -16,11 +23,18 @@ public static class SyncGatewayBuilderExtensions
             collection = db.CreateCollection(collectionName, builder.ScopeName);
         }
 
-        List<string>? channelsList = channels.Any() ? channels.ToList() : null;
-        var collectionConfiguration = new CollectionConfiguration
+        var collectionConfiguration = builder.ReplicatorConfiguration.GetCollectionConfig(collection);
+        if(collectionConfiguration is null)
         {
-            Channels = channelsList
-        };        
+            collectionConfiguration = new CollectionConfiguration();
+        }
+
+        configure(collectionConfiguration);
+
+        if(collectionConfiguration.Channels is not null && !collectionConfiguration.Channels.Any())
+        {
+            collectionConfiguration.Channels = null;
+        }
 
         builder.ReplicatorConfiguration.AddCollection(collection, collectionConfiguration);
 

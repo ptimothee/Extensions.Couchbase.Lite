@@ -14,15 +14,18 @@ public interface ISyncGateway : IDisposable
     public void Start();
 
     public void Stop();
+
+    public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure);
 }
 
 public class SyncGateway: ISyncGateway
 {
     private Replicator? _replicator;
+    private Credentials? _credentials;
     private readonly SyncOptions _options;
     private readonly ReplicatorConfiguration _config;
     private readonly ISessionService _sessionService;
-
+    
     public SyncGateway(string name, SyncOptions options, ISessionService sessionService)
     {
         Name = name;
@@ -35,7 +38,7 @@ public class SyncGateway: ISyncGateway
 
     public async Task SignInAsync(Credentials credentials, CancellationToken cancellationToken = default)
     {
-        credentials ??= new AnonymousCredentials();
+        _credentials ??= new AnonymousCredentials();
       
         if(credentials is JwtCredentials jwtCredentials)
         {
@@ -91,6 +94,19 @@ public class SyncGateway: ISyncGateway
             return;
         }
         _replicator.Stop();
+    }
+
+    public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure)
+    {
+        if (_replicator is null || _credentials is null)
+        {
+            throw new Exception("Replicator is not initialized. Call SignedInAsync method to initialize the replicator. ");
+        }
+
+        var replicationBuiler = new ReplicatorConfigurationBuilder(_options.Database, _options.ScopeName, _config);
+        configure(_credentials, replicationBuiler);
+
+        _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, true);
     }
 
     public void Dispose()
