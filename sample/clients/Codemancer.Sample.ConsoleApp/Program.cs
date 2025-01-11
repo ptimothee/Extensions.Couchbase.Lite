@@ -8,11 +8,11 @@ var services = new ServiceCollection();
 services.AddCouchbaseLite("my-database")
         .WithSyncGateway(new Uri("wss://{id}.apps.cloud.couchbase.com:4984/{my-endpoint}"), options =>
         {
+            options.ScopeName = "{endpoint-scope}";
             options.ConfigureReplication = (username, builder) =>
             {
                 builder.ReplicatorConfiguration.Continuous = true;
-                builder.UseScope("my-scope")
-                        .LinkCollection("my-collection", []);
+                builder.LinkCollection("my-collection", []);
             };
 
             options.Events.OnStatusChanged += (sender, args) =>
