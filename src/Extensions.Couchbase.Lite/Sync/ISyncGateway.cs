@@ -26,23 +26,21 @@ public class SyncGateway: ISyncGateway
     private readonly ReplicatorConfiguration _config;
     private readonly ISessionService _sessionService;
     
-    public SyncGateway(string name, SyncOptions options, ISessionService sessionService)
+    public SyncGateway(SyncOptions options, ISessionService sessionService)
     {
-        Name = name;
         _options = options;
         _sessionService = sessionService;
         _config = new ReplicatorConfiguration(new URLEndpoint(options.Endpoint));
     }
 
-    public string Name { get; }
+    public string Name { get { return _config.GetEndpointName(); } }
 
     public async Task SignInAsync(Credentials credentials, CancellationToken cancellationToken = default)
     {
-        _credentials ??= new AnonymousCredentials();
-      
+        credentials ??= new AnonymousCredentials();
         if(credentials is JwtCredentials jwtCredentials)
         {
-            var session = await _sessionService.CreateSessionAsync(_config.Target.AsHttpUri(), jwtCredentials.IdToken, cancellationToken);
+            var session = await _sessionService.CreateSessionAsync(_config.GetHttpEndpoint(), jwtCredentials.IdToken, cancellationToken);
             credentials = new SessionCredentials(session.Username, session.SessionId);
         }
 
@@ -50,6 +48,8 @@ public class SyncGateway: ISyncGateway
 
         var replicationBuiler = new ReplicatorConfigurationBuilder(_options.Database, _options.ScopeName, _config);
         _options.ConfigureReplication(credentials.Username, replicationBuiler);
+
+        _credentials = credentials;
 
         //var resume = IsRunning(_replicator) || FailedToRun(_replicator);
         _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, false);
@@ -70,7 +70,7 @@ public class SyncGateway: ISyncGateway
 
         if (_replicator.Config.Authenticator is SessionAuthenticator)
         {
-            await _sessionService.DeleteSessionAsync(_config.Target.AsHttpUri(), cancellationToken);
+            await _sessionService.DeleteSessionAsync(_config.GetHttpEndpoint(), cancellationToken);
         }
         _config.Authenticator = null;
 
@@ -98,7 +98,7 @@ public class SyncGateway: ISyncGateway
 
     public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure)
     {
-        if (_replicator is null || _credentials is null)
+        if(_replicator is null || _credentials is null)
         {
             throw new Exception("Replicator is not initialized. Call SignedInAsync method to initialize the replicator. ");
         }
