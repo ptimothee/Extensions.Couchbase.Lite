@@ -2,8 +2,11 @@
 
 public interface IAppService
 {
+    public IEnumerable<ISyncGateway> Gateways { get; }
+
     public ISyncGateway GetSyncGateway(string endpointName);
 }
+
 
 public class AppService(Dictionary<string, ISyncGateway> namedGateways) : IAppService
 {
@@ -18,5 +21,7 @@ public class AppService(Dictionary<string, ISyncGateway> namedGateways) : IAppSe
 
         throw new InvalidOperationException($"No gateway registered for endpoint name '{endpointName}'. ");
     }
+
+    public IEnumerable<ISyncGateway> Gateways { get { return _namedGateways.Values; } }
 }
 
