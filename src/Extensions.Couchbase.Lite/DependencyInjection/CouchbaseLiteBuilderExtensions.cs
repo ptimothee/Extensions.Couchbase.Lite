@@ -7,18 +7,22 @@ namespace Codemancer.Extensions.Couchbase.Lite.DependencyInjection;
 
 public static class CouchbaseLiteBuilderExtensions
 {
-    public static ICouchbaseLiteBuilder AddCouchbaseLite(this IServiceCollection services, string databaseName, Action<DatabaseConfiguration>? configure = null)
+    public static ICouchbaseLiteBuilder AddCouchbaseLite(this IServiceCollection services, string databaseName, Action<DatabaseBuildOptions>? configure = null)
     {
-        DatabaseConfiguration? configuration = null;
+        DatabaseBuildOptions? options = null;
         if (configure is not null)
         {
-            configuration = new();
-            configure(configuration);
+            options = new();
+            configure(options);
         }
         
         services.AddSingleton<Database>(sp =>
         {
-            return new Database(databaseName, configuration);
+            var database = new Database(databaseName, options?.Config);
+
+            options?.OnBuildDatabase(database);
+           
+            return database;
         });
 
         return new CouchbaseLiteBuilder(services);
@@ -35,30 +39,22 @@ public static class CouchbaseLiteBuilderExtensions
 
         services.TryAddSingleton<ISessionService, SessionService>();
 
-        services.AddKeyedSingleton<ISyncGateway>(endpointName, (sp, key) =>
+        services.AddSingleton<ISyncGateway>(sp =>
         {
-            var name = Convert.ToString(key)!;
-
             var database = sp.GetRequiredService<Database>();
             var sessionService = sp.GetRequiredService<ISessionService>();
             var options = new SyncOptions(uri, database);
 
             configure(options);
 
-            return new SyncGateway(name, options, sessionService);
+            return new SyncGateway(options, sessionService);
         });
 
         services.TryAddSingleton<IAppService>(sp =>
         {
-            var keys = services.Where(sd => sd.IsKeyedService && sd.ServiceType == typeof(ISyncGateway))
-                                .Select(x => x.ServiceKey!.ToString()!);
+            var gateways = sp.GetRequiredService<IEnumerable<ISyncGateway>>();
+            var map = gateways.ToDictionary(gw => gw.Name, gw => gw);
 
-            Dictionary<string, ISyncGateway> map = new(keys.Count());
-            foreach (var key in keys)
-            {
-                var service = sp.GetRequiredKeyedService<ISyncGateway>(key);
-                map.Add(key, service);
-            }
             return new AppService(map);
         });
 
