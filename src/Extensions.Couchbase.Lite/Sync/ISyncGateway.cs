@@ -1,4 +1,5 @@
-﻿using Couchbase.Lite.Sync;
+﻿using Couchbase.Lite;
+using Couchbase.Lite.Sync;
 using Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 namespace Codemancer.Extensions.Couchbase.Lite.Sync;
@@ -14,39 +15,43 @@ public interface ISyncGateway : IDisposable
     public void Start();
 
     public void Stop();
+
+    public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure);
 }
 
 public class SyncGateway: ISyncGateway
 {
     private Replicator? _replicator;
+    private Credentials? _credentials;
     private readonly SyncOptions _options;
     private readonly ReplicatorConfiguration _config;
     private readonly ISessionService _sessionService;
+    private readonly Database _database;
 
-    public SyncGateway(string name, SyncOptions options, ISessionService sessionService)
+    public SyncGateway(ReplicatorConfiguration replicatorConfig, SyncOptions options, Database database, ISessionService sessionService)
     {
-        Name = name;
         _options = options;
+        _config = replicatorConfig;
+        _database = database;
         _sessionService = sessionService;
-        _config = new ReplicatorConfiguration(new URLEndpoint(options.Endpoint));
     }
 
-    public string Name { get; }
+    public string Name { get { return _config.GetEndpointName(); } }
 
     public async Task SignInAsync(Credentials credentials, CancellationToken cancellationToken = default)
     {
         credentials ??= new AnonymousCredentials();
-      
         if(credentials is JwtCredentials jwtCredentials)
         {
-            var session = await _sessionService.CreateSessionAsync(_config.Target.AsHttpUri(), jwtCredentials.IdToken, cancellationToken);
+            var session = await _sessionService.CreateSessionAsync(_config.GetHttpEndpoint(), jwtCredentials.IdToken, cancellationToken);
             credentials = new SessionCredentials(session.Username, session.SessionId);
         }
 
         _config.Authenticator = Credentials.Create(credentials);
-
-        var replicationBuiler = new ReplicatorConfigurationBuilder(_options.Database, _config);
+        var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
         _options.ConfigureReplication(credentials.Username, replicationBuiler);
+
+        _credentials = credentials;
 
         //var resume = IsRunning(_replicator) || FailedToRun(_replicator);
         _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, false);
@@ -67,7 +72,7 @@ public class SyncGateway: ISyncGateway
 
         if (_replicator.Config.Authenticator is SessionAuthenticator)
         {
-            await _sessionService.DeleteSessionAsync(_config.Target.AsHttpUri(), cancellationToken);
+            await _sessionService.DeleteSessionAsync(_config.GetHttpEndpoint(), cancellationToken);
         }
         _config.Authenticator = null;
 
@@ -91,6 +96,19 @@ public class SyncGateway: ISyncGateway
             return;
         }
         _replicator.Stop();
+    }
+
+    public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure)
+    {
+        if(_replicator is null || _credentials is null)
+        {
+            throw new Exception("Replicator is not initialized. Call SignedInAsync method to initialize the replicator. ");
+        }
+
+        var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
+        configure(_credentials, replicationBuiler);
+
+        _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, true);
     }
 
     public void Dispose()

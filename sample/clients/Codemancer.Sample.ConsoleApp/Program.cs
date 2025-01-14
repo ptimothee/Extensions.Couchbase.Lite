@@ -6,13 +6,13 @@ using Codemancer.Extensions.Couchbase.Lite.DependencyInjection;
 var services = new ServiceCollection();
 
 services.AddCouchbaseLite("my-database")
-        .WithSyncGateway(new Uri("wss://{id}.apps.cloud.couchbase.com:4984/{my-endpoint}"), options =>
+        .WithSyncGateway(new Uri("wss://{id}.apps.cloud.couchbase.com:4984/{endpoint-name}"), options =>
         {
+            options.ScopeName = "{endpoint-scope}";
             options.ConfigureReplication = (username, builder) =>
             {
                 builder.ReplicatorConfiguration.Continuous = true;
-                builder.UseScope("my-scope")
-                        .LinkCollection("my-collection", []);
+                builder.LinkCollection("{collection-name}", []);
             };
 
             options.Events.OnStatusChanged += (sender, args) =>
@@ -32,11 +32,9 @@ services.AddCouchbaseLite("my-database")
 var serviceProvider = services.BuildServiceProvider();
 
 var appService = serviceProvider.GetRequiredService<IAppService>();
-var syncGateway = appService.GetSyncGateway("my-endpoint");
+var syncGateway = appService.GetSyncGateway("{endpoint-name}");
 
-var idToken = "";
-
-var credentials = Credentials.CreateJwt(idToken);
+var credentials = Credentials.CreateJwt("{idToken}");
 
 await syncGateway.SignInAsync(credentials);
 

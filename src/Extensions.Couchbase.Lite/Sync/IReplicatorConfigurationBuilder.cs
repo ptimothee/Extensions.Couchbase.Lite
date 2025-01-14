@@ -14,18 +14,11 @@ public interface IReplicatorConfigurationBuilder
 
 internal class ReplicatorConfigurationBuilder : IReplicatorConfigurationBuilder
 {
-    public ReplicatorConfigurationBuilder(Database database, ReplicatorConfiguration replicatorConfiguration, string? scopeName = null)
+    public ReplicatorConfigurationBuilder(Database database, string scopeName, ReplicatorConfiguration replicatorConfiguration)
     {
         Database = database;
+        ScopeName = scopeName;
         ReplicatorConfiguration = replicatorConfiguration;
-        if (scopeName is null)
-        {
-            ScopeName = database.GetDefaultScope().Name;
-        }
-        else
-        {
-            ScopeName = scopeName;
-        }
     }
 
     public ReplicatorConfiguration ReplicatorConfiguration { get; }

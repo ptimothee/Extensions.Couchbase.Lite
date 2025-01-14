@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Text.Json.Serialization;
+using Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 namespace Codemancer.Extensions.Couchbase.Lite.Sync;
 
@@ -17,7 +18,8 @@ public class SessionService(IHttpClientFactory httpClientFactory) : ISessionServ
 
     private HttpClient CreateHttpClient(Uri baseAddress)
     {
-        var httpClient = _httpClientFactory.CreateClient();
+
+        var httpClient = _httpClientFactory.CreateClient(baseAddress.GetEndpointName());
         httpClient.BaseAddress = baseAddress;
         httpClient.DefaultRequestHeaders.UserAgent.Add(ProductInfoHeaderValue.Parse("dotnet-httpclient"));
 

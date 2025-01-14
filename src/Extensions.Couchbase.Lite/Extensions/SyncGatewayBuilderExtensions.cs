@@ -6,12 +6,14 @@ namespace Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 public static class SyncGatewayBuilderExtensions
 {
-    public static IReplicatorConfigurationBuilder UseScope(this IReplicatorConfigurationBuilder builder, string scopeName)
+    public static IReplicatorConfigurationBuilder LinkCollection(this IReplicatorConfigurationBuilder builder, string collectionName, string[] channels)
     {
-        return new ReplicatorConfigurationBuilder(builder.Database, builder.ReplicatorConfiguration, scopeName);
+        LinkCollection(builder, collectionName, collectionConfig => collectionConfig.Channels = channels);
+
+        return builder;
     }
 
-    public static IReplicatorConfigurationBuilder LinkCollection(this IReplicatorConfigurationBuilder builder, string collectionName, string[] channels)
+    public static IReplicatorConfigurationBuilder LinkCollection(this IReplicatorConfigurationBuilder builder, string collectionName, Action<CollectionConfiguration> configure )
     {
         Database db = builder.Database;
 
@@ -21,13 +23,35 @@ public static class SyncGatewayBuilderExtensions
             collection = db.CreateCollection(collectionName, builder.ScopeName);
         }
 
-        List<string>? channelsList = channels.Any() ? channels.ToList() : null;
-        var collectionConfiguration = new CollectionConfiguration
+        var collectionConfiguration = builder.ReplicatorConfiguration.GetCollectionConfig(collection);
+        if(collectionConfiguration is null)
         {
-            Channels = channelsList
-        };        
+            collectionConfiguration = new CollectionConfiguration();
+        }
+
+        configure(collectionConfiguration);
+
+        if(collectionConfiguration.Channels is not null && !collectionConfiguration.Channels.Any())
+        {
+            collectionConfiguration.Channels = null;
+        }
 
         builder.ReplicatorConfiguration.AddCollection(collection, collectionConfiguration);
+
+        return builder;
+    }
+
+    public static IReplicatorConfigurationBuilder UnlinkCollection(this IReplicatorConfigurationBuilder builder, string collectionName)
+    {
+        Database db = builder.Database;
+
+        var collection = db.GetCollection(collectionName, builder.ScopeName);
+        if (collection is null)
+        {
+            return builder;
+        }
+
+        builder.ReplicatorConfiguration.RemoveCollection(collection);
 
         return builder;
     }
