@@ -2,6 +2,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Codemancer.Extensions.Couchbase.Lite.Sync;
+using Couchbase.Lite.Sync;
+using Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 namespace Codemancer.Extensions.Couchbase.Lite.DependencyInjection;
 
@@ -32,22 +34,22 @@ public static class CouchbaseLiteBuilderExtensions
     {
         var services = builder.Services;
 
-        string endpointName = uri.Segments.Last().Trim('/');
+        var options = new SyncOptions();
+        configure(options);
 
-        //TODO: provide hook configure message handler
-        services.AddHttpClient();
+        var replicatorConfiguration = new ReplicatorConfiguration(new URLEndpoint(uri));
 
+        var httpClientBuilder = services.AddHttpClient(replicatorConfiguration.GetEndpointName())
+                                        .ConfigureAdditionalHttpMessageHandlers(options.ConfigureSessionDelegatingHandler);
+        
         services.TryAddSingleton<ISessionService, SessionService>();
 
         services.AddSingleton<ISyncGateway>(sp =>
         {
             var database = sp.GetRequiredService<Database>();
             var sessionService = sp.GetRequiredService<ISessionService>();
-            var options = new SyncOptions(uri, database);
-
-            configure(options);
-
-            return new SyncGateway(options, sessionService);
+            
+            return new SyncGateway(replicatorConfiguration, options, database, sessionService);
         });
 
         services.TryAddSingleton<IAppService>(sp =>

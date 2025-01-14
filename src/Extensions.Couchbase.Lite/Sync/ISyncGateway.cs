@@ -1,4 +1,5 @@
-﻿using Couchbase.Lite.Sync;
+﻿using Couchbase.Lite;
+using Couchbase.Lite.Sync;
 using Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 namespace Codemancer.Extensions.Couchbase.Lite.Sync;
@@ -25,12 +26,14 @@ public class SyncGateway: ISyncGateway
     private readonly SyncOptions _options;
     private readonly ReplicatorConfiguration _config;
     private readonly ISessionService _sessionService;
-    
-    public SyncGateway(SyncOptions options, ISessionService sessionService)
+    private readonly Database _database;
+
+    public SyncGateway(ReplicatorConfiguration replicatorConfig, SyncOptions options, Database database, ISessionService sessionService)
     {
         _options = options;
+        _config = replicatorConfig;
+        _database = database;
         _sessionService = sessionService;
-        _config = new ReplicatorConfiguration(new URLEndpoint(options.Endpoint));
     }
 
     public string Name { get { return _config.GetEndpointName(); } }
@@ -45,8 +48,7 @@ public class SyncGateway: ISyncGateway
         }
 
         _config.Authenticator = Credentials.Create(credentials);
-
-        var replicationBuiler = new ReplicatorConfigurationBuilder(_options.Database, _options.ScopeName, _config);
+        var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
         _options.ConfigureReplication(credentials.Username, replicationBuiler);
 
         _credentials = credentials;
@@ -103,7 +105,7 @@ public class SyncGateway: ISyncGateway
             throw new Exception("Replicator is not initialized. Call SignedInAsync method to initialize the replicator. ");
         }
 
-        var replicationBuiler = new ReplicatorConfigurationBuilder(_options.Database, _options.ScopeName, _config);
+        var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
         configure(_credentials, replicationBuiler);
 
         _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, true);

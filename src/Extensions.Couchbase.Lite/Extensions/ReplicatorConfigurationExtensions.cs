@@ -41,7 +41,7 @@ namespace Codemancer.Extensions.Couchbase.Lite.Extensions
             return uriBuilder.Uri;
         }
 
-        private static string GetEndpointName(this Uri uri)
+        internal static string GetEndpointName(this Uri uri)
         {
             return uri.Segments.Last().Trim('/');
         }

@@ -5,17 +5,9 @@ namespace Codemancer.Extensions.Couchbase.Lite.Sync;
 
 public class SyncOptions
 {
-    public SyncOptions(Uri uri, Database database)
-    {
-        Endpoint = uri;
-        Database = database;
-    }
-
-    public Uri Endpoint { get; }
-
     public string ScopeName { get; set; } = Collection.DefaultScopeName;
 
-    public Database Database { get; }
+    public Action<IList<DelegatingHandler>, IServiceProvider> ConfigureSessionDelegatingHandler { get; set; } = (handlers, sp) => { };
 
     public Action<string, IReplicatorConfigurationBuilder> ConfigureReplication { get; set; } = (username, builder) => { };
 
