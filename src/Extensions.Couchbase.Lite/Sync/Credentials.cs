@@ -11,12 +11,15 @@ public abstract class Credentials
 
     public static Credentials CreateBasic(string username, string password) => new BasicCredentials(username, password);
 
-    public static Credentials CreateJwt(string idToken)
+    public static Credentials CreateJwt(string idToken, AuthenticationMethod authenticationMethod = AuthenticationMethod.SessionProvider, Action<UsernameBuildOptions>? configure = null)
     {
         var handler = new JwtSecurityTokenHandler();
         var token = handler.ReadJwtToken(idToken);
 
-        return new JwtCredentials(token.Subject, idToken);
+        var options = new UsernameBuildOptions("sub", token.Issuer);
+        configure?.Invoke(options);
+
+        return new JwtCredentials(token, authenticationMethod, options);
     }
 
     internal static Authenticator? Create(Credentials credentials)
@@ -34,6 +37,11 @@ public abstract class Credentials
         if (credentials is SessionCredentials sessionCredentials)
         {
             return new SessionAuthenticator(sessionCredentials.SessionId);
+        }
+
+        if(credentials is JwtCredentials jwtCredentials && jwtCredentials.AuthenticationMethod == AuthenticationMethod.AuthorizationHeader)
+        {
+            return null;
         }
 
         throw new NotSupportedException($"Unsupported credentials type: {typeof(Credentials).FullName}. ");
@@ -61,12 +69,23 @@ public sealed class BasicCredentials : Credentials
 
 public sealed class JwtCredentials : Credentials
 {
-    internal JwtCredentials(string username, string idToken)
+    internal JwtCredentials(JwtSecurityToken token, AuthenticationMethod authenticationMethod, UsernameBuildOptions options)
     {
-        IdToken = idToken;
+        if (!token.Payload.TryGetValue(options.ClaimType, out var claimValue))
+        {
+            throw new InvalidOperationException($"ClaimType: '{options .ClaimType}' not found in supplied JWT token. ");
+        }
+
+        Username = $"{options.Prefix}_{claimValue}";
+        IdToken = token.RawData;
+        Options = options;
     }
 
     public string IdToken { get; }
+
+    public AuthenticationMethod AuthenticationMethod { get; }
+
+    private UsernameBuildOptions Options { get; }
 }
 
 public sealed class SessionCredentials : Credentials

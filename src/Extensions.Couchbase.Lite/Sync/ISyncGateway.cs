@@ -43,8 +43,15 @@ public class SyncGateway: ISyncGateway
         credentials ??= new AnonymousCredentials();
         if(credentials is JwtCredentials jwtCredentials)
         {
-            var session = await _sessionService.CreateSessionAsync(_config.GetHttpEndpoint(), jwtCredentials.IdToken, cancellationToken);
-            credentials = new SessionCredentials(session.Username, session.SessionId);
+            if (jwtCredentials.AuthenticationMethod == AuthenticationMethod.SessionProvider)
+            {
+                var session = await _sessionService.CreateSessionAsync(_config.GetHttpEndpoint(), jwtCredentials.IdToken, cancellationToken);
+                credentials = new SessionCredentials(session.Username, session.SessionId);
+            }
+            else
+            {
+                _config.Headers.Add("Authorization", $"Bearer {jwtCredentials.IdToken}");
+            }
         }
 
         _config.Authenticator = Credentials.Create(credentials);
