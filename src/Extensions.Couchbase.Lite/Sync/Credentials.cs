@@ -78,6 +78,7 @@ public sealed class JwtCredentials : Credentials
 
         Username = $"{options.Prefix}_{claimValue}";
         IdToken = token.RawData;
+        AuthenticationMethod = authenticationMethod;
         Options = options;
     }
 
