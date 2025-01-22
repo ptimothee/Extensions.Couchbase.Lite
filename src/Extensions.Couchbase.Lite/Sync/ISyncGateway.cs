@@ -74,6 +74,12 @@ public class SyncGateway: ISyncGateway
 
         if (_replicator.Config.Authenticator is null)
         {
+            if(_replicator.Config.Headers.ContainsKey("Authorization"))
+            {
+                _replicator.Config.Headers.Remove("Authorization");
+            }
+
+            _replicator = null;
             return;
         }
 
