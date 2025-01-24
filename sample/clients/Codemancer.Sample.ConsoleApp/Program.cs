@@ -9,7 +9,7 @@ services.AddCouchbaseLite("my-database")
         .WithSyncGateway(new Uri("wss://{id}.apps.cloud.couchbase.com:4984/{endpoint-name}"), options =>
         {
             options.ScopeName = "{endpoint-scope}";
-            options.ConfigureReplication = (username, builder) =>
+            options.ConfigureReplication = (userPrincipal, builder, sp) =>
             {
                 builder.ReplicatorConfiguration.Continuous = true;
                 builder.LinkCollection("{collection-name}", []);

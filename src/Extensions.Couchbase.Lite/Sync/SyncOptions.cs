@@ -1,5 +1,6 @@
 ﻿using Couchbase.Lite;
 using Couchbase.Lite.Sync;
+using System.Security.Principal;
 
 namespace Codemancer.Extensions.Couchbase.Lite.Sync;
 
@@ -9,7 +10,7 @@ public class SyncOptions
 
     public Action<IList<DelegatingHandler>, IServiceProvider> ConfigureSessionDelegatingHandler { get; set; } = (handlers, sp) => { };
 
-    public Action<string, IReplicatorConfigurationBuilder> ConfigureReplication { get; set; } = (username, builder) => { };
+    public Action<IPrincipal, IReplicatorConfigurationBuilder, IServiceProvider> ConfigureReplication { get; set; } = (principal, builder, sp) => { };
 
     public SyncEvents Events { get; set; } = new SyncEvents();
 }

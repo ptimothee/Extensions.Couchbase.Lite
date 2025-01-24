@@ -1,5 +1,7 @@
 ﻿using Couchbase.Lite;
 using Couchbase.Lite.Sync;
+using System.Security.Principal;
+using Microsoft.Extensions.DependencyInjection;
 using Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 namespace Codemancer.Extensions.Couchbase.Lite.Sync;
@@ -16,24 +18,28 @@ public interface ISyncGateway : IDisposable
 
     public void Stop();
 
-    public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure);
+    public void Resync(Action<IPrincipal, IReplicatorConfigurationBuilder> configure);
+
+    public void Resync(Action<IPrincipal, IReplicatorConfigurationBuilder, IServiceProvider> configure);
 }
 
 public class SyncGateway: ISyncGateway
 {
     private Replicator? _replicator;
-    private Credentials? _credentials;
+    private IPrincipal? _principal;
     private readonly SyncOptions _options;
     private readonly ReplicatorConfiguration _config;
     private readonly ISessionService _sessionService;
     private readonly Database _database;
+    private readonly IServiceProvider _serviceProvider;
 
-    public SyncGateway(ReplicatorConfiguration replicatorConfig, SyncOptions options, Database database, ISessionService sessionService)
+    public SyncGateway(ReplicatorConfiguration replicatorConfig, SyncOptions options, Database database, ISessionService sessionService, IServiceProvider serviceProvider)
     {
         _options = options;
         _config = replicatorConfig;
         _database = database;
         _sessionService = sessionService;
+        _serviceProvider = serviceProvider;
     }
 
     public string Name { get { return _config.GetEndpointName(); } }
@@ -55,10 +61,13 @@ public class SyncGateway: ISyncGateway
         }
 
         _config.Authenticator = Credentials.Create(credentials);
-        var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
-        _options.ConfigureReplication(credentials.Username, replicationBuiler);
+        _principal = new GenericPrincipal(new GenericIdentity(credentials.Username), Array.Empty<string>());
 
-        _credentials = credentials;
+        var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            _options.ConfigureReplication(_principal, replicationBuiler, scope.ServiceProvider);
+        }
 
         //var resume = IsRunning(_replicator) || FailedToRun(_replicator);
         _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, false);
@@ -111,15 +120,23 @@ public class SyncGateway: ISyncGateway
         _replicator.Stop();
     }
 
-    public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure)
+    public void Resync(Action<IPrincipal, IReplicatorConfigurationBuilder> configure)
     {
-        if(_replicator is null || _credentials is null)
+        Resync((principal, builder, serviceProvider) => configure(principal, builder));
+    }
+
+    public void Resync(Action<IPrincipal, IReplicatorConfigurationBuilder, IServiceProvider> configure)
+    {
+        if (_replicator is null || _principal is null)
         {
             throw new Exception("Replicator is not initialized. Call SignedInAsync method to initialize the replicator. ");
         }
 
         var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
-        configure(_credentials, replicationBuiler);
+        using (var scope = _serviceProvider.CreateScope())
+        {   
+            configure(_principal, replicationBuiler, scope.ServiceProvider);
+        }
 
         _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, true);
     }
