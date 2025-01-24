@@ -29,16 +29,14 @@ public class SyncGateway: ISyncGateway
     private IPrincipal? _principal;
     private readonly SyncOptions _options;
     private readonly ReplicatorConfiguration _config;
-    private readonly ISessionService _sessionService;
     private readonly Database _database;
     private readonly IServiceProvider _serviceProvider;
 
-    public SyncGateway(ReplicatorConfiguration replicatorConfig, SyncOptions options, Database database, ISessionService sessionService, IServiceProvider serviceProvider)
+    public SyncGateway(ReplicatorConfiguration replicatorConfig, SyncOptions options, Database database, IServiceProvider serviceProvider)
     {
         _options = options;
         _config = replicatorConfig;
         _database = database;
-        _sessionService = sessionService;
         _serviceProvider = serviceProvider;
     }
 
@@ -51,8 +49,13 @@ public class SyncGateway: ISyncGateway
         {
             if (jwtCredentials.AuthenticationMethod == AuthenticationMethod.SessionProvider)
             {
-                var session = await _sessionService.CreateSessionAsync(_config.GetHttpEndpoint(), jwtCredentials.IdToken, cancellationToken);
-                credentials = new SessionCredentials(session.Username, session.SessionId);
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var sessionService = scope.ServiceProvider.GetRequiredService<ISessionService>();
+                    var session = await sessionService.CreateSessionAsync(_config.GetHttpEndpoint(), jwtCredentials.IdToken, cancellationToken);
+
+                    credentials = new SessionCredentials(session.Username, session.SessionId);
+                }
             }
             else
             {
@@ -94,7 +97,11 @@ public class SyncGateway: ISyncGateway
 
         if (_replicator.Config.Authenticator is SessionAuthenticator)
         {
-            await _sessionService.DeleteSessionAsync(_config.GetHttpEndpoint(), cancellationToken);
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var sessionService = scope.ServiceProvider.GetRequiredService<ISessionService>();
+                await sessionService.DeleteSessionAsync(_config.GetHttpEndpoint(), cancellationToken);
+            }
         }
         _config.Authenticator = null;
 

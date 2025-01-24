@@ -47,9 +47,8 @@ public static class CouchbaseLiteBuilderExtensions
         services.AddSingleton<ISyncGateway>(sp =>
         {
             var database = sp.GetRequiredService<Database>();
-            var sessionService = sp.GetRequiredService<ISessionService>();
             
-            return new SyncGateway(replicatorConfiguration, options, database, sessionService, sp);
+            return new SyncGateway(replicatorConfiguration, options, database, sp);
         });
 
         services.TryAddSingleton<IAppService>(sp =>
