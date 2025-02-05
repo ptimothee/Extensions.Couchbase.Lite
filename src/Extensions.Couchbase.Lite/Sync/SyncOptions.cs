@@ -9,7 +9,7 @@ public class SyncOptions
 
     public Action<IList<DelegatingHandler>, IServiceProvider> ConfigureSessionDelegatingHandler { get; set; } = (handlers, sp) => { };
 
-    public Action<string, IReplicatorConfigurationBuilder> ConfigureReplication { get; set; } = (username, builder) => { };
+    public Action<IReplicatorConfigurationBuilder, SyncSessionContext> ConfigureReplication { get; set; } = (builder, context) => { };
 
     public SyncEvents Events { get; set; } = new SyncEvents();
 }

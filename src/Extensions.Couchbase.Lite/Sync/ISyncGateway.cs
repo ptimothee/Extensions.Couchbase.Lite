@@ -1,42 +1,47 @@
 ﻿using Couchbase.Lite;
 using Couchbase.Lite.Sync;
+using System.Security.Principal;
+using Microsoft.Extensions.DependencyInjection;
 using Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 namespace Codemancer.Extensions.Couchbase.Lite.Sync;
 
-public interface ISyncGateway : IDisposable
+public interface ISyncGateway : IAsyncDisposable
 {
     public string  Name { get; }
+
+    public IPrincipal? User { get; }
 
     public Task SignInAsync(Credentials credentials, CancellationToken cancellationToken = default);
 
     public Task SignOutAsync(CancellationToken cancellationToken = default);
 
-    public void Start();
+    public Task StartAsync();
 
-    public void Stop();
+    public Task StopAsync();
 
-    public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure);
+    public Task Resync(Action<IReplicatorConfigurationBuilder, SyncSessionContext> configure);
 }
 
 public class SyncGateway: ISyncGateway
 {
     private Replicator? _replicator;
-    private Credentials? _credentials;
     private readonly SyncOptions _options;
-    private readonly ReplicatorConfiguration _config;
-    private readonly ISessionService _sessionService;
+    private ReplicatorConfiguration _config;
     private readonly Database _database;
+    private readonly IServiceProvider _serviceProvider;
 
-    public SyncGateway(ReplicatorConfiguration replicatorConfig, SyncOptions options, Database database, ISessionService sessionService)
+    public SyncGateway(ReplicatorConfiguration replicatorConfig, SyncOptions options, Database database, IServiceProvider serviceProvider)
     {
         _options = options;
         _config = replicatorConfig;
         _database = database;
-        _sessionService = sessionService;
+        _serviceProvider = serviceProvider;
     }
 
     public string Name { get { return _config.GetEndpointName(); } }
+
+    public IPrincipal? User { get; private set; }
 
     public async Task SignInAsync(Credentials credentials, CancellationToken cancellationToken = default)
     {
@@ -45,8 +50,14 @@ public class SyncGateway: ISyncGateway
         {
             if (jwtCredentials.AuthenticationMethod == AuthenticationMethod.SessionProvider)
             {
-                var session = await _sessionService.CreateSessionAsync(_config.GetHttpEndpoint(), jwtCredentials.IdToken, cancellationToken);
-                credentials = new SessionCredentials(session.Username, session.SessionId);
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var sessionService = scope.ServiceProvider.GetRequiredService<ISessionService>();
+                    var session = await sessionService.CreateSessionAsync(_config.GetHttpEndpoint(), jwtCredentials.IdToken, cancellationToken)
+                                                        .ConfigureAwait(false);
+
+                    credentials = new SessionCredentials(session.Username, session.SessionId);
+                }
             }
             else
             {
@@ -55,14 +66,16 @@ public class SyncGateway: ISyncGateway
         }
 
         _config.Authenticator = Credentials.Create(credentials);
+        User = new GenericPrincipal(new GenericIdentity(credentials.Username), Array.Empty<string>());
+
         var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
-        _options.ConfigureReplication(credentials.Username, replicationBuiler);
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            _options.ConfigureReplication(replicationBuiler, new SyncSessionContext(User, scope.ServiceProvider));
+        }
 
-        _credentials = credentials;
-
-        //var resume = IsRunning(_replicator) || FailedToRun(_replicator);
-        _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, false);
-        _replicator.Start();
+        _replicator = Create(replicationBuiler.ReplicatorConfiguration);
+        await _replicator.StartAsync().ConfigureAwait(false);
     }
 
     public async Task SignOutAsync(CancellationToken cancellationToken = default)
@@ -72,114 +85,91 @@ public class SyncGateway: ISyncGateway
             return;
         }
 
-        if (_replicator.Config.Authenticator is null)
+        try
         {
-            if(_replicator.Config.Headers.ContainsKey("Authorization"))
+            await _replicator.StopAsync().ConfigureAwait(false);
+
+            if (_replicator.Config.Authenticator is null)
             {
-                _replicator.Config.Headers.Remove("Authorization");
+                if (_replicator.Config.Headers.ContainsKey("Authorization"))
+                {
+                    _replicator.Config.Headers.Remove("Authorization");
+                }
+                return;
             }
 
+            if (_replicator.Config.Authenticator is SessionAuthenticator)
+            {
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var sessionService = scope.ServiceProvider.GetRequiredService<ISessionService>();
+                    await sessionService.DeleteSessionAsync(_replicator.Config.GetHttpEndpoint(), cancellationToken)
+                                        .ConfigureAwait(false);
+                }
+            }
+            _config.Authenticator = null;
+        }
+        finally
+        {
+            User = null;
+            _replicator.Dispose();
             _replicator = null;
-            return;
         }
-
-        if (_replicator.Config.Authenticator is SessionAuthenticator)
-        {
-            await _sessionService.DeleteSessionAsync(_config.GetHttpEndpoint(), cancellationToken);
-        }
-        _config.Authenticator = null;
-
-        Delete(_replicator);
-        _replicator = null;
     }
 
-    public void Start()
+    public Task StartAsync()
     {
-        if(_replicator is null)
+        if (_replicator is null || User is null)
         {
-            throw new Exception("Replicator is not initialized. Call SignedInAsync method to initialize the replicator. ");
+            throw new Exception("Replicator is not initialized. Call SignedInAsync method to authenticate and initialize the replicator. ");
         }
-        _replicator.Start();
+        return _replicator.StartAsync();
     }
 
-    public void Stop()
+    public Task StopAsync()
+    {
+        if (_replicator is null)
+        {
+            return Task.CompletedTask;
+        }
+        return _replicator.StopAsync();
+    }
+
+    public async Task Resync(Action<IReplicatorConfigurationBuilder, SyncSessionContext> configure)
+    {
+        if (_replicator is null || User is null)
+        {
+            throw new Exception("Replicator is not initialized. Call SignedInAsync method to authenticate and initialize the replicator. ");
+        }
+
+        var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
+        using (var scope = _serviceProvider.CreateScope())
+        {   
+            configure(replicationBuiler, new SyncSessionContext(User, scope.ServiceProvider));
+        }
+
+        await _replicator.StopAsync().ConfigureAwait(false);
+        _replicator.Dispose();
+        _replicator = null;
+        _replicator = Create(replicationBuiler.ReplicatorConfiguration);
+        await _replicator.StartAsync().ConfigureAwait(false);
+    }
+
+    public async ValueTask DisposeAsync()
     {
         if (_replicator is null)
         {
             return;
         }
-        _replicator.Stop();
-    }
-
-    public void Resync(Action<Credentials, IReplicatorConfigurationBuilder> configure)
-    {
-        if(_replicator is null || _credentials is null)
-        {
-            throw new Exception("Replicator is not initialized. Call SignedInAsync method to initialize the replicator. ");
-        }
-
-        var replicationBuiler = new ReplicatorConfigurationBuilder(_database, _options.ScopeName, _config);
-        configure(_credentials, replicationBuiler);
-
-        _replicator = Rebuild(_replicator, replicationBuiler.ReplicatorConfiguration, true);
-    }
-
-    public void Dispose()
-    {
-        if(_replicator is null)
-        {
-            return;
-        }
-        Delete(_replicator);
+        await _replicator.StopAsync().ConfigureAwait(false);
+        _replicator.Dispose();
         _replicator = null;
     }
 
-    private Replicator Rebuild(Replicator? replicator, ReplicatorConfiguration config, bool autoStart)
-    {
-        if (replicator is not null)
-        {
-            Delete(replicator);
-            replicator = null;
-        }
-
-        return Create(config, autoStart);
-    }
-
-    private Replicator Create(ReplicatorConfiguration config, bool autoStart)
+    private Replicator Create(ReplicatorConfiguration config)
     {
         var replicator = new Replicator(config);
         replicator.AddChangeListener(_options.Events.OnStatusChanged);
-        if (autoStart)
-        {
-            replicator.Start();
-        }
         return replicator;
     }
-
-    private void Delete(Replicator replicator)
-    {
-        replicator.Stop();
-        replicator.Dispose();
-    }
-
-    private bool IsRunning(Replicator? replicator)
-    {
-        if(replicator is null)
-        {
-            return false;
-        }
-
-        return replicator.Status.Activity != ReplicatorActivityLevel.Stopped;
-    }
-
-    private bool FailedToRun(Replicator? replicator)
-    {
-        if (replicator is null)
-        {
-            return false;
-        }
-        return replicator.Status.Activity == ReplicatorActivityLevel.Stopped && replicator.Status.Error != null;
-    }
-
 }
-

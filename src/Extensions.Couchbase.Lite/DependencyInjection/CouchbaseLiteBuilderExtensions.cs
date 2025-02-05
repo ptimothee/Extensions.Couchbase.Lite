@@ -1,8 +1,8 @@
 ﻿using Couchbase.Lite;
+using Couchbase.Lite.Sync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Codemancer.Extensions.Couchbase.Lite.Sync;
-using Couchbase.Lite.Sync;
 using Codemancer.Extensions.Couchbase.Lite.Extensions;
 
 namespace Codemancer.Extensions.Couchbase.Lite.DependencyInjection;
@@ -47,9 +47,8 @@ public static class CouchbaseLiteBuilderExtensions
         services.AddSingleton<ISyncGateway>(sp =>
         {
             var database = sp.GetRequiredService<Database>();
-            var sessionService = sp.GetRequiredService<ISessionService>();
             
-            return new SyncGateway(replicatorConfiguration, options, database, sessionService);
+            return new SyncGateway(replicatorConfiguration, options, database, sp);
         });
 
         services.TryAddSingleton<IAppService>(sp =>
