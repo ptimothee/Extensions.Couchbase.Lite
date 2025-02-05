@@ -14,7 +14,7 @@ trigger:
       -  features/*
 
 variables:
-  version: 0.0
+  version: 0.1
   ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
     semVer: $(version).0
     assemblyVersion: "$(version).0.$(Build.BuildNumber)"
