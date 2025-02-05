@@ -9,7 +9,7 @@ services.AddCouchbaseLite("my-database")
         .WithSyncGateway(new Uri("wss://{id}.apps.cloud.couchbase.com:4984/{endpoint-name}"), options =>
         {
             options.ScopeName = "{endpoint-scope}";
-            options.ConfigureReplication = (userPrincipal, builder, sp) =>
+            options.ConfigureReplication = (builder, context) =>
             {
                 builder.ReplicatorConfiguration.Continuous = true;
                 builder.LinkCollection("{collection-name}", []);
@@ -42,5 +42,5 @@ Console.WriteLine("Press any key to terminate. ");
 Console.ReadLine();
 
 await syncGateway.SignOutAsync();
-syncGateway.Dispose();
+await syncGateway.DisposeAsync();
 
